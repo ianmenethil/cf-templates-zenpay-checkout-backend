@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { build } from 'vite';
+import { createBuilder } from 'vite';
 import { ALL_FIXTURES, ALL_SCENARIOS, API_KEY, PASSWORD, USERNAME } from './helpers/zenpay-fixtures';
 
 /**
@@ -83,7 +83,9 @@ export default async function setup(): Promise<void> {
   // Vitest sets NODE_ENV to `test`; the build needs the production setting.
   process.env.NODE_ENV = 'production';
   try {
-    await build({ mode: 'production', logLevel: 'warn' });
+    // Vite's `build()` builds one environment, the admin panel. `buildApp()` builds all of them, as `vite build` does here, so the Worker exists too.
+    const builder = await createBuilder({ mode: 'production', logLevel: 'warn' });
+    await builder.buildApp();
   } finally {
     if (nodeEnv === undefined) {
       delete process.env.NODE_ENV;
