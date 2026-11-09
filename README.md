@@ -293,7 +293,7 @@ The body is judged before the rate limit is applied, and only callbacks that do 
 
 ### Unsigned notifications
 
-ZenPay sometimes posts a callback with no `validationCode`. In ZenPay's tests Mode 0 sometimes sent one before the signed callback, and Mode 3 sent one first and, on some tests, nothing else. An unsigned callback cannot be verified, so it never marks a payment succeeded or failed. It moves a payment from `pending` to `unverified` and nothing more, and the body is kept as received (for example a `preauthStatus` that is the text `"Successful"`). A Mode 3 payment can therefore stay `unverified`. Confirm such a payment another way, such as ZenPay's API or portal, before treating it as authorised. The "Unsigned notifications" part of ZenPay's callback documentation lists what the sandbox sent; check it again before relying on it.
+A callback can arrive with no `validationCode`. It cannot be verified, so it never marks a payment succeeded or failed. It moves a payment from `pending` to `unverified` and nothing more, and its body is kept as received. If a payment stays `unverified`, confirm it another way, such as ZenPay's API or portal, before treating it as paid or authorised.
 
 ### Replays
 
