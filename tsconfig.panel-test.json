@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.panel-test.tsbuildinfo",
+    "types": ["vite/client", "vitest/browser"]
+  },
+  "include": ["src/react-app", "src/shared", "test/panel"]
+}

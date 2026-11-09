@@ -1,0 +1,9 @@
+{
+  "singleQuote": true,
+  "printWidth": 140,
+  "overrides": [
+    { "files": "src/react-app/**", "options": { "singleQuote": false } },
+    { "files": "*.{yml,yaml}", "options": { "singleQuote": false } },
+    { "files": "*.jsonc", "options": { "trailingComma": "none" } }
+  ]
+}

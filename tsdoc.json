@@ -1,0 +1,16 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/tsdoc/v0/tsdoc.schema.json",
+  "noStandardTags": true,
+  "tagDefinitions": [
+    { "tagName": "@param", "syntaxKind": "block", "allowMultiple": true },
+    { "tagName": "@returns", "syntaxKind": "block" },
+    { "tagName": "@throws", "syntaxKind": "block", "allowMultiple": true },
+    { "tagName": "@link", "syntaxKind": "inline", "allowMultiple": true }
+  ],
+  "supportForTags": {
+    "@param": true,
+    "@returns": true,
+    "@throws": true,
+    "@link": true
+  }
+}

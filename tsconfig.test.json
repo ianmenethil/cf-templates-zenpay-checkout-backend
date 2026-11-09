@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "allowImportingTsExtensions": true,
+    "types": ["vite/client", "./worker-configuration.d.ts", "node", "@cloudflare/vitest-plugin/types"]
+  },
+  "include": ["test", "vitest.config.ts", "src/worker", "src/shared"],
+  "exclude": ["test/panel"]
+}

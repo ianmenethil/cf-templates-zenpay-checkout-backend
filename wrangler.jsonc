@@ -1,0 +1,72 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "zenpay-checkout-backend",
+  "main": "src/worker/index.ts",
+  // The Workers runtime behaviour the Worker runs with. Cloudflare changes the runtime over time; this date pins which changes apply.
+  // Move it forward only after running the tests.
+  "compatibility_date": "2026-11-01",
+  // `nodejs_compat` turns on Node.js compatible APIs. The Worker tests read this file, so they run with the same flag.
+  "compatibility_flags": ["nodejs_compat"],
+  // Uploads source maps with each deploy, so error stack traces can show the TypeScript source.
+  "upload_source_maps": true,
+  // `enabled` turns on Workers Logs. `redact_query_string` removes the query string from the request URLs in logs and traces:
+  // the callback address carries its signed token in the query string (`?t=...`), and this keeps the token out of the logs.
+  "observability": { "enabled": true, "redact_query_string": true },
+  // The admin panel (the React app built by Vite) is served at /admin. The Worker runs first on every
+  // /admin request so its Cloudflare Access check covers the panel's files as well as the API.
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "run_worker_first": ["/admin", "/admin/*"]
+  },
+  "vars": {
+    // Company name shown in the admin panel.
+    "BRAND_NAME": "Menethil",
+    // Payments and callbacks are deleted this many days after the payment's state last changed, by the daily cron below.
+    // A whole number above 0. A larger value than 3650 counts as 3650; anything else (text, 0, a negative number) counts as 30.
+    "RETENTION_DAYS": "30",
+    // The ZenPay hosted checkout address the shopper's page opens. This is the sandbox. For live payments, ask ZenPay for your
+    // program's live address. The Worker accepts only a ZenPay checkout address and answers 500 for any other.
+    "ZENPAY_CHECKOUT_URL": "https://pay.sandbox.travelpay.com.au/online/v5",
+    // Your ZenPay merchant code. The checkout API answers 500 until it is set.
+    "ZENPAY_MERCHANT_CODE": "",
+    // Origins of the website that shows the Pay button, separated by commas, for example
+    // "https://shop.example.com,https://www.shop.example.com". Only these origins may call /api/checkout, for the status check too.
+    // The checkout API answers 403 to every request until it is set.
+    "ALLOWED_ORIGINS": "",
+    // The page on your shop where the shopper lands after paying, for example "https://shop.example.com/thanks". @zp-hcp/server refuses
+    // a launch without it, so the checkout API answers 500 until it is a valid address. In the modal (displayMode 0) the plugin only
+    // moves the page to an address that starts with it; with displayMode 1 the browser goes to it after payment.
+    "REDIRECT_URL": "",
+    // Cloudflare Access protecting /admin: your team domain and the application's AUD tag.
+    // The admin panel refuses every request until both are set.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  },
+  // Secrets are not stored in this file. Deploy to Cloudflare asks for them from .dev.vars.example. For the first deploy by hand, the
+  // README shows how to give them in a file; later, set one with `wrangler secret put <NAME>`. For local development, list them
+  // in .dev.vars. .dev.vars.example describes each. `pnpm run cf-typegen` types them from this list.
+  "secrets": {
+    "required": ["ZENPAY_API_KEY", "ZENPAY_USERNAME", "ZENPAY_PASSWORD", "CALLBACK_TOKEN_SECRET"]
+  },
+  // No id. With Deploy to Cloudflare, the button creates the database and fills in its id. For a manual first deploy, see
+  // "Deploy by hand" in the README: `pnpm run deploy` cannot find a database that does not exist yet, so the first deploy is different.
+  // `pnpm run deploy` applies migrations/ to the database.
+  "d1_databases": [{ "binding": "DB", "database_name": "zenpay-checkout-backend", "migrations_dir": "migrations" }],
+  // Each `namespace_id` only has to be different from the others in your Cloudflare account: bindings with the same id share their counts.
+  // Rate limits are approximate: each Cloudflare location counts on its own.
+  "ratelimits": [
+    // 10 checkout requests per minute for each visitor (client IP address).
+    { "name": "CHECKOUT_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
+    // 60 status checks per minute for each visitor, so a page can poll a payment every second or two.
+    { "name": "STATUS_LIMITER", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } },
+    // 60 callbacks per minute that do not verify, for each payment (or for each sender address when the callback address names no
+    // payment). A callback that verifies is never counted.
+    { "name": "CALLBACK_LIMITER", "namespace_id": "1003", "simple": { "limit": 60, "period": 60 } }
+  ],
+  // Every day at 03:00 UTC the Worker deletes payments, with their callbacks, older than RETENTION_DAYS, and callbacks that belong to no
+  // payment once their latest delivery is that old.
+  "triggers": { "crons": ["0 3 * * *"] },
+  // Local development only: simulates a signed-in Access user so /admin works under `pnpm run dev`.
+  "access": { "dev": { "aud": "local-dev", "identity": { "email": "admin@ianmenethil.com" } } }
+}

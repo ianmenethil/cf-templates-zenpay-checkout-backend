@@ -1,0 +1,24 @@
+# The four secrets of this Worker. Deploy to Cloudflare reads this file and asks for them when it creates the Worker.
+# For local development, copy this file to .dev.vars and fill them in.
+# For the first deploy by hand, do not use .dev.vars. Put only these four secrets in a separate file, .dev.vars.production,
+# and give it to Wrangler with --secrets-file (see "Deploy by hand" in the README). Git ignores every .dev.vars* file.
+
+# Your ZenPay API key, username and password. The Worker uses the username and password only on the server,
+# inside the checkout fingerprint and to check that a callback really comes from ZenPay: they never reach the
+# browser. The API key is returned to the shopper's page, because ZenPay's plugin needs it.
+ZENPAY_API_KEY=
+ZENPAY_USERNAME=
+ZENPAY_PASSWORD=
+
+# A long random string of your own, at least 32 bytes, that signs the callback address of each payment.
+# Make one with: openssl rand -hex 32
+# Changing it later makes callback addresses already given to ZenPay unreadable, so do it when no payment is open.
+CALLBACK_TOKEN_SECRET=
+
+# Local development only: remove the "# " from the next two lines in your .dev.vars so the
+# admin panel opens on your machine. They match the signed-in user that `access.dev` in
+# wrangler.jsonc simulates. They stay commented here because Deploy to Cloudflare reads the
+# Worker's secrets from this file, and these two are `vars` in wrangler.jsonc, not secrets.
+# Never put them in the production secrets file.
+# ACCESS_TEAM_DOMAIN=https://local-dev.cloudflareaccess.com
+# ACCESS_AUD=local-dev

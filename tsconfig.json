@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "compilerOptions": {
+    "paths": { "@/*": ["./src/react-app/*"] }
+  },
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" },
+    { "path": "./tsconfig.worker.json" },
+    { "path": "./tsconfig.test.json" },
+    { "path": "./tsconfig.panel-test.json" }
+  ]
+}
