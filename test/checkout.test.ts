@@ -361,7 +361,7 @@ describe('POST /api/checkout', () => {
       expect(await paymentRow(scenario.mupid)).not.toBeNull();
     });
 
-    it('accepts an amount of 0 for mode 1, and no name or reference for modes 1 and 3', async () => {
+    it('accepts an amount of 0 and no name or reference for mode 1', async () => {
       const tokenise = await postCheckout({
         mode: 1,
         paymentAmount: 0,
@@ -370,14 +370,20 @@ describe('POST /api/checkout', () => {
         customerReference: '',
       });
       expect(tokenise.status).toBe(200);
-      const preauth = await postCheckout({
-        mode: 3,
-        paymentAmount: 10,
-        customerName: '',
-        customerEmail: 'a@example.com',
-        customerReference: '',
-      });
-      expect(preauth.status).toBe(200);
+    });
+
+    // ZenPay's hosted checkout shows "The Customer Reference field is required" and blocks Pay Now for a mode 3
+    // launch without them, so the payment would sit pending.
+    it.each([
+      ['an empty customer name', { customerName: '' }, 'customerName is required for this mode.'],
+      ['a blank customer name', { customerName: '   ' }, 'customerName is required for this mode.'],
+      ['an empty customer reference', { customerReference: '' }, 'customerReference is required for this mode.'],
+      ['a blank customer reference', { customerReference: '  ' }, 'customerReference is required for this mode.'],
+    ])('refuses mode 3 with %s, storing nothing', async (_case, fields, error) => {
+      const response = await postCheckout({ ...valid, mode: 3, paymentAmount: 10, ...fields });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error });
+      expect(await countPayments()).toBe(0);
     });
 
     it('accepts amounts with one or two decimals, and trims text fields', async () => {

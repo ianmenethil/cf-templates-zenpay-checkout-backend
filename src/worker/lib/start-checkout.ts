@@ -91,15 +91,14 @@ const requestFor = (modes: readonly PaymentMode[], rules: { positiveAmount: bool
 
 /**
  * The body of `POST /api/checkout`. Fields it does not name are dropped, so nothing a shopper's page adds can reach the
- * launch. Modes 0 and 2 need a customer name and reference and an amount above 0, mode 1 needs neither, and mode 3 needs
- * only the amount.
+ * launch. Modes 0, 2 and 3 need a customer name and reference and an amount above 0: ZenPay's hosted checkout blocks
+ * Pay Now when either is empty. Mode 1 (Tokenise) needs neither and accepts an amount of 0.
  */
 export const startCheckoutSchema = z.discriminatedUnion(
   'mode',
   [
-    requestFor([0, 2], { positiveAmount: true, identityRequired: true }),
+    requestFor([0, 2, 3], { positiveAmount: true, identityRequired: true }),
     requestFor([1], { positiveAmount: false, identityRequired: false }),
-    requestFor([3], { positiveAmount: true, identityRequired: false }),
   ],
   { error: (issue) => (isJsonObject(issue.input) ? MODE_MESSAGE : NOT_AN_OBJECT_MESSAGE) },
 );

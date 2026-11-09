@@ -34,7 +34,7 @@ Built with [Hono](https://hono.dev), [D1](https://developers.cloudflare.com/d1/)
 ## How a payment flows
 
 ```
-Shopper's page          This Worker                         ZenPay
+Pay / return page       This Worker                         ZenPay
       |                      |                                 |
       | 1. POST /api/checkout|                                 |
       |--------------------->| new payment ID, fingerprint,    |
@@ -55,7 +55,7 @@ Shopper's page          This Worker                         ZenPay
 1. The shopper's page calls `POST /api/checkout` when Pay is pressed, not when the page loads, because a fingerprint is valid for 15 minutes from its `timestamp`.
 2. The page passes the answer to `zpPayment(...)`. ZenPay's hosted checkout opens in the shopper's browser.
 3. ZenPay posts the result to the `callbackUrl` the Worker made, which carries a signed `t` token holding the payment's ID, mode and amount.
-4. While the shopper waits, the page polls `GET /api/checkout/<merchantUniquePaymentId>` and shows the state.
+4. ZenPay moves the shopper's page to `REDIRECT_URL` after payment. That page polls `GET /api/checkout/<merchantUniquePaymentId>` and shows the state.
 
 ## Get started
 
@@ -106,7 +106,7 @@ What each one does when it is wrong:
 - **Checkout needs the four secrets and three settings.** `POST /api/checkout` needs the four secrets plus `ZENPAY_MERCHANT_CODE`, `ZENPAY_CHECKOUT_URL` and `REDIRECT_URL`. A callback needs only the four secrets. A missing setting, or a `CALLBACK_TOKEN_SECRET` under 32 bytes, gives `500` with `{"error":"Not configured"}`.
 - **`ZENPAY_CHECKOUT_URL`** must be a ZenPay hosted checkout address. The package accepts `https://pay.<program>.com.au/online/v5` (or `v4`), where `<program>` is `travelpay`, `childcareeasypay`, `zenpay`, `b2bpay`, `schooleasypay`, `thoroughbredpayments` or `rentalrewards`, and `pay.sandbox` or `payuat` can stand in for `pay` on the test systems. It refuses any other host, and a refused address gives `500`.
 - **`ALLOWED_ORIGINS`** is a list of origins. An origin is the scheme, host and port with no path, such as `https://shop.ianmenethil.com`; a trailing slash is ignored. Until it is set, the checkout API answers `403` with `{"error":"Not configured"}` to everyone.
-- **`REDIRECT_URL`** is required: `@zp-hcp/server` refuses a launch without a `redirectUrl`, and says that without one the modal stays open after payment. Until it is a valid web address, the checkout API answers `500` with `{"error":"Not configured"}`. With the modal (`displayMode: 0`, as in the snippet below) the plugin only moves your page to an address that starts with it. With `displayMode: 1` the browser goes to it after payment.
+- **`REDIRECT_URL`** is required: `@zp-hcp/server` refuses a launch without a `redirectUrl`, and says that without one the modal stays open after payment. Until it is a valid web address, the checkout API answers `500` with `{"error":"Not configured"}`. After every completed payment ZenPay moves the shopper's whole page to it, in modal mode (`displayMode: 0`) and in redirect mode (`displayMode: 1`) alike; see [Using it from the shopper's page](#using-it-from-the-shoppers-page).
 - **`RETENTION_DAYS`** above 3650 counts as 3650. Anything that is not a whole number above 0 (text, `0`, a negative number, `1.5`) counts as 30, so a typo cannot delete everything.
 
 ### 4. Give the Worker its own domain
@@ -134,11 +134,19 @@ A trailing slash on the team domain is ignored. Until both are set, `/admin` ans
 
 ### 6. Make a test payment
 
-Add the snippet below to a page on your shop's origin (next section), open it, and pay with a ZenPay sandbox test card. Then open `https://checkout.ianmenethil.com/admin`, sign in with Access, and the payment is in the list with the callback ZenPay sent.
+Add the two pieces of code from the next section to two pages on your shop's origin, the Pay page and the page at `REDIRECT_URL`, open the Pay page, and pay with a ZenPay sandbox test card. Then open `https://checkout.ianmenethil.com/admin`, sign in with Access, and the payment is in the list with the callback ZenPay sent.
 
 ## Using it from the shopper's page
 
-Call the Worker when Pay is pressed, pass what it returns to the plugin, then poll for the result. This follows the "Building the Payload" section of ZenPay's hosted checkout documentation, with the Worker supplying the values; the ZenPay plugin script must already be loaded on the page, as that documentation describes.
+Two pages are involved, because ZenPay moves the shopper's whole page (the top window) to `REDIRECT_URL` after every completed payment, in modal mode (`displayMode: 0`) as well as in redirect mode (`displayMode: 1`). The Pay page asks the Worker for a launch and opens the checkout. The page at `REDIRECT_URL` is where the shopper lands, and it reads the result. Code on the Pay page that waits for the payment never gets to run, so the Pay page keeps the payment's ID where the return page can read it.
+
+This follows the "Building the Payload" section of ZenPay's hosted checkout documentation, with the Worker supplying the values. Load the ZenPay v6 plugin on the Pay page first. It needs no jQuery, Bootstrap or stylesheet, and it provides `zpPayment`:
+
+```html
+<script src="https://cdn.zenithpayments.support/sdk/zp-hcp/zenpay.payment.min.js"></script>
+```
+
+**The Pay page** asks the Worker for a signed launch when Pay is pressed, keeps the payment's ID, and opens the checkout:
 
 ```javascript
 const CHECKOUT = 'https://checkout.ianmenethil.com';
@@ -151,24 +159,30 @@ async function pay(amount, customer) {
     body: JSON.stringify({
       mode: 0, // 0 Make Payment, 1 Tokenise, 2 Custom Payment, 3 Preauthorisation
       paymentAmount: amount, // a number of dollars, at most 2 decimals, for example 49.9
-      customerName: customer.name,
+      customerName: customer.name, // modes 0, 2 and 3 need a name and a reference; mode 1 may send empty text, but the fields must be there
       customerEmail: customer.email,
-      // Modes 0 and 2 need a name and a reference. For modes 1 and 3 send them as empty text; the fields must still be there.
       customerReference: customer.reference,
     }),
   });
   const launch = await response.json();
   if (!response.ok) throw new Error(launch.error);
 
-  // 2. Open the ZenPay checkout with exactly what the Worker returned.
-  const payment = zpPayment({ ...launch, displayMode: 0 });
-  payment.init();
+  // 2. Keep the payment's ID for the page ZenPay sends the shopper to.
+  sessionStorage.setItem('paymentId', launch.merchantUniquePaymentId);
 
-  // 3. Poll until a verified callback has settled the payment, or give up after a while.
-  return waitForResult(launch.merchantUniquePaymentId);
+  // 3. Open the ZenPay checkout with exactly what the Worker returned.
+  zpPayment({ ...launch, displayMode: 0 }).init();
 }
+```
 
-async function waitForResult(id, timeoutMs = 5 * 60 * 1000) {
+**The page at `REDIRECT_URL`** reads the ID and polls the Worker until a verified callback has settled the payment, or gives up after a while:
+
+```javascript
+const CHECKOUT = 'https://checkout.ianmenethil.com';
+
+async function waitForResult(timeoutMs = 5 * 60 * 1000) {
+  const id = sessionStorage.getItem('paymentId');
+  if (!id) throw new Error('No payment to look up');
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const response = await fetch(`${CHECKOUT}/api/checkout/${id}`);
@@ -183,11 +197,10 @@ async function waitForResult(id, timeoutMs = 5 * 60 * 1000) {
 }
 ```
 
-How the page and the Worker meet:
+How the pages and the Worker meet:
 
-- **Origin.** The page's origin must be in `ALLOWED_ORIGINS`. The browser sends it as the `Origin` header, and the Worker answers the [CORS](https://developer.mozilla.org/docs/Web/HTTP/CORS) preflight for it. This applies to the status check (`GET /api/checkout/<id>`) as well as to `POST /api/checkout`. A request from any other origin, or with no `Origin` header, gets `403`.
-- **A page on the Worker's own origin cannot poll.** A browser sends `Origin` on cross-origin requests and on same-origin `POST`, but not on a same-origin `GET`. A page served from the Worker's own origin therefore gets `403` on the status check. Serve your page from its own origin (here `https://shop.ianmenethil.com`), list that origin in `ALLOWED_ORIGINS`, and keep the Worker on its own domain (here `https://checkout.ianmenethil.com`).
-- **Modal or redirect.** The snippet opens the checkout in a modal (`displayMode: 0`). With `displayMode: 1` the browser leaves your page for ZenPay's page and goes to `REDIRECT_URL` afterwards. In redirect mode the page is gone by then, so keep the `merchantUniquePaymentId` somewhere the return page can read it, and poll with it as above.
+- **Origin.** Both pages must be on an origin listed in `ALLOWED_ORIGINS`. The browser sends it as the `Origin` header, and the Worker answers the [CORS](https://developer.mozilla.org/docs/Web/HTTP/CORS) preflight for it. This applies to the status check (`GET /api/checkout/<id>`) as well as to `POST /api/checkout`. A request from any other origin, or with no `Origin` header, gets `403`. `sessionStorage` is per origin, so the Pay page and the page at `REDIRECT_URL` must share one.
+- **A page on the Worker's own origin cannot poll.** A browser sends `Origin` on cross-origin requests and on same-origin `POST`, but not on a same-origin `GET`. A page served from the Worker's own origin therefore gets `403` on the status check. Serve your pages from their own origin (here `https://shop.ianmenethil.com`), list that origin in `ALLOWED_ORIGINS`, and keep the Worker on its own domain (here `https://checkout.ianmenethil.com`).
 - **The request body** has its own rules, in [The checkout request](#the-checkout-request).
 
 What to do with the `state` the page reads:
@@ -213,13 +226,13 @@ For modes 0 and 2 the `reference` the page reads is ZenPay's payment reference a
 
 `POST /api/checkout` takes a JSON body, sent with `Content-Type: application/json`. Without that header the Worker does not read the body and answers `400`. Fields not listed here are ignored, so nothing a page adds reaches the launch. Text fields are trimmed, then checked. The whole body may be at most 8 KB.
 
-| Field               | Type               | Needed for                                                                              | Rules                                                                                                                                                                      |
-| ------------------- | ------------------ | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`              | number             | Every mode                                                                              | `0` Make Payment, `1` Tokenise, `2` Custom Payment, `3` Preauthorisation. Anything else, text such as `"0"` included, is refused                                           |
-| `paymentAmount`     | number, in dollars | Every mode, mode 1 too                                                                  | A number, not text, with at most 2 decimals and at most 10,000,000. It must be above 0 for modes 0, 2 and 3. Mode 1 accepts 0                                              |
-| `customerName`      | text               | Modes 0 and 2 need text. Modes 1 and 3 may send empty text, but the field must be there | At most 100 characters, no control characters                                                                                                                              |
-| `customerReference` | text               | Modes 0 and 2 need text. Modes 1 and 3 may send empty text, but the field must be there | At most 100 characters, no control characters                                                                                                                              |
-| `customerEmail`     | text               | Every mode                                                                              | At most 254 characters, no control characters, one `@`, no spaces, and a dot in the domain. ZenPay's own email check then runs on the launch and can refuse an address too |
+| Field               | Type               | Needed for                                                                          | Rules                                                                                                                                                                      |
+| ------------------- | ------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`              | number             | Every mode                                                                          | `0` Make Payment, `1` Tokenise, `2` Custom Payment, `3` Preauthorisation. Anything else, text such as `"0"` included, is refused                                           |
+| `paymentAmount`     | number, in dollars | Every mode, mode 1 too                                                              | A number, not text, with at most 2 decimals and at most 10,000,000. It must be above 0 for modes 0, 2 and 3. Mode 1 accepts 0                                              |
+| `customerName`      | text               | Modes 0, 2 and 3 need text. Mode 1 may send empty text, but the field must be there | At most 100 characters, no control characters                                                                                                                              |
+| `customerReference` | text               | Modes 0, 2 and 3 need text. Mode 1 may send empty text, but the field must be there | At most 100 characters, no control characters                                                                                                                              |
+| `customerEmail`     | text               | Every mode                                                                          | At most 254 characters, no control characters, one `@`, no spaces, and a dot in the domain. ZenPay's own email check then runs on the launch and can refuse an address too |
 
 A refused request gets `400` with `{"error":"..."}` naming the first thing wrong, for example `customerReference is required for this mode.`, and nothing is stored. A body that is not JSON gets `Malformed JSON in request body`. A body that is JSON but not an object gets `The request body must be a JSON object.`
 

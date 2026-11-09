@@ -35,8 +35,8 @@
     // The checkout API answers 403 to every request until it is set.
     "ALLOWED_ORIGINS": "",
     // The page on your shop where the shopper lands after paying, for example "https://shop.example.com/thanks". @zp-hcp/server refuses
-    // a launch without it, so the checkout API answers 500 until it is a valid address. In the modal (displayMode 0) the plugin only
-    // moves the page to an address that starts with it; with displayMode 1 the browser goes to it after payment.
+    // a launch without it, so the checkout API answers 500 until it is a valid address. After a completed payment ZenPay moves the
+    // shopper's page to it, in the modal (displayMode 0) and in redirect mode (displayMode 1) alike; poll for the result there.
     "REDIRECT_URL": "",
     // Cloudflare Access protecting /admin: your team domain and the application's AUD tag.
     // The admin panel refuses every request until both are set.

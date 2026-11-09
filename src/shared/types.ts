@@ -50,11 +50,11 @@ export type StartCheckoutRequest = {
    * for modes 0, 2 and 3; mode 1 accepts 0.
    */
   paymentAmount: number;
-  /** The customer's name: at most 100 characters, no control characters. It may be empty for modes 1 and 3, not for 0 and 2. */
+  /** The customer's name: at most 100 characters, no control characters. It may be empty for mode 1, not for modes 0, 2 and 3. */
   customerName: string;
   /** The customer's email address: at most 254 characters, one `@`, no spaces, a dot in the domain, no control characters. Required for every mode. */
   customerEmail: string;
-  /** The merchant's own reference for the customer: at most 100 characters, no control characters. It may be empty for modes 1 and 3, not for 0 and 2. */
+  /** The merchant's own reference for the customer: at most 100 characters, no control characters. It may be empty for mode 1, not for modes 0, 2 and 3. */
   customerReference: string;
 };
 
