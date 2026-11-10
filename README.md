@@ -61,6 +61,21 @@ Pay / return page       This Worker                         ZenPay
 
 The example values below use a sample company, Menethil, with the shop `shop.ianmenethil.com`, the Worker domain `checkout.ianmenethil.com` and the admin `admin@ianmenethil.com`. Replace them with your own.
 
+### Install with an AI agent
+
+Instead of the steps below, paste this prompt into Claude Code, Codex, Gemini CLI, Cursor or any other AI coding agent:
+
+```text
+Install ZenPay Checkout Backend on my Cloudflare account by following the instructions here:
+https://raw.githubusercontent.com/ianmenethil/cf-templates-zenpay-checkout-backend/main/.claude/INSTALLER.md
+```
+
+The agent asks for your settings, asks before it changes anything in your Cloudflare account, and has you type your ZenPay credentials into a private file it never reads back. To read the instructions yourself first:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ianmenethil/cf-templates-zenpay-checkout-backend/main/.claude/INSTALLER.md
+```
+
 ### 1. Deploy
 
 Click **Deploy to Cloudflare** above. Cloudflare copies this template into your GitHub or GitLab account, asks for the four secrets (step 2) and deploys the Worker.
