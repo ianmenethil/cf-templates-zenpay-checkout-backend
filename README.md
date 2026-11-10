@@ -443,6 +443,7 @@ eslint.config.js             ESLint rules: TypeScript, React hooks and TSDoc
 .editorconfig                Editor settings: UTF-8, LF line endings, 2 spaces
 .dev.vars.example            The four secrets, and the template for the local `.dev.vars`
 pnpm-workspace.yaml          pnpm settings: which packages may run install scripts, and dependency overrides
+.claude/INSTALLER.md         Step-by-step install playbook for an AI coding agent: it takes a person from nothing to a deployed, checked install
 .github/workflows/ci.yml     CI: audit, generated types, formatting, lint, types, tests, build and a dry-run deploy
 .github/secret_scanning.yml  Tells GitHub secret scanning to skip test/, which holds made-up credentials
 ```
